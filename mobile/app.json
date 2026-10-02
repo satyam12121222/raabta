@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Raabta",
+    "slug": "raabta-relationships",
+    "version": "0.2.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "raabta",
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.satyammishra.raabta",
+      "versionCode": 2,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#F7F3EB"
+      },
+      "permissions": []
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-router"
+    ]
+  }
+}
