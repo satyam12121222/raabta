@@ -17,7 +17,7 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: DB_PATH
-        value: /var/data/raabta.db
+        value: /tmp/raabta.db
       - key: REGISTRATION_MODE
         value: invite
       - key: REQUIRE_EMAIL_VERIFICATION
