@@ -1,8 +1,9 @@
 FROM node:24-alpine
 WORKDIR /app
-COPY package.json ./
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 COPY src ./src
-COPY admin.mjs backup.mjs ./
+COPY admin.mjs backup.mjs review-photos.mjs ./
 RUN mkdir -p /data /backups && chown node:node /data /backups
 USER node
 ENV HOST=0.0.0.0 PORT=8080 DB_PATH=/data/raabta.db

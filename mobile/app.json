@@ -25,7 +25,15 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-router"
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose your Raabta profile photos.",
+          "cameraPermission": "Take a private selfie for photo review.",
+          "microphonePermission": false
+        }
+      ]
     ]
   }
 }

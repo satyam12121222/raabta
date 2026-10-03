@@ -13,6 +13,7 @@ export function configFromEnv(env = process.env) {
   }
   const publicOrigin = (env.PUBLIC_ORIGIN || '').replace(/\/$/, '');
   return {
+    photoUploadsEnabled: !production || env.PROFILE_PHOTOS_ENABLED === "true",
     dbPath: env.DB_PATH || 'data/raabta.db', dataKey: env.DATA_KEY, inviteCode: env.INVITE_CODE,
     aiKey: env.OPENAI_API_KEY, aiModel: env.OPENAI_MODEL,
     mailKey: env.RESEND_API_KEY, mailFrom: env.MAIL_FROM,

@@ -1,4 +1,11 @@
 export type Profile = {
+  heightCm?: number | null;
+  bio?: string;
+  education?: string;
+  occupation?: string;
+  languages?: string;
+  drinking?: string;
+  relationshipStatus?: string;
   name: string;
   dob: string;
   city: string;
@@ -32,6 +39,15 @@ export type User = {
   aiConfigured: boolean;
 };
 export type Person = {
+  heightCm?: number | null;
+  bio?: string;
+  education?: string;
+  occupation?: string;
+  languages?: string;
+  drinking?: string;
+  relationshipStatus?: string;
+  photos?: { id: string; slot: number }[];
+  photoVerified?: boolean;
   id: string;
   name: string;
   age: number;
