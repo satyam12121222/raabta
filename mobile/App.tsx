@@ -41,6 +41,7 @@ import {
   VALUES,
 } from "./src/types";
 import { SecurityPanel } from "./src/SecurityPanel";
+import { PhotosPanel, PhotoGallery } from "./src/Photos";
 import { Recovery } from "./src/Recovery";
 import { blankProfile, ProfileForm } from "./src/ProfileForm";
 import {
@@ -881,6 +882,15 @@ function PersonCard({
           <Text style={s.caption}>{person.city} · Serious relationship</Text>
         </View>
       </View>
+      <PhotoGallery photos={person.photos} />
+      {person.photoVerified && <Body>✓ Photos manually reviewed</Body>}
+      {!!person.heightCm && <Body>{person.heightCm} cm · {Math.floor(Math.round(person.heightCm / 2.54) / 12)}′ {Math.round(person.heightCm / 2.54) % 12}″</Body>}
+      {!!person.bio && <Body>{person.bio}</Body>}
+      {!!person.occupation && <Body>Work: {person.occupation}</Body>}
+      {!!person.education && <Body>Education: {person.education}</Body>}
+      {!!person.languages && <Body>Languages: {person.languages}</Body>}
+      {!!person.relationshipStatus && person.relationshipStatus !== "Prefer not to say" && <Body>{person.relationshipStatus}</Body>}
+      {!!person.drinking && person.drinking !== "Prefer not to say" && <Body>Drinks: {person.drinking}</Body>}
       <Body>
         {person.card?.about || "This person is updating their profile."}
       </Body>
@@ -1272,6 +1282,7 @@ function Account({
           remove stored conversations and memory.
         </Text>
       </Panel>
+      <PhotosPanel refresh={refresh} />
       <Button
         title={editing ? "Close preferences" : "Edit my preferences"}
         secondary

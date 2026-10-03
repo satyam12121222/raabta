@@ -46,6 +46,16 @@ export function ProfileForm({
         onChangeText={(v) => set("city", v)}
         maxLength={60}
       />
+      <Field label="Height (cm) · optional" placeholder="e.g. 172" value={p.heightCm == null ? "" : String(p.heightCm)} keyboardType="number-pad" maxLength={3} onChangeText={v => set("heightCm", v === "" ? null : Number(v))} />
+      <Field label="About me · optional" placeholder="What would you like someone to know about you?" value={p.bio || ""} maxLength={400} multiline onChangeText={v => set("bio", v)} />
+      <Field label="Education · optional" value={p.education || ""} maxLength={100} onChangeText={v => set("education", v)} />
+      <Field label="Work · optional" value={p.occupation || ""} maxLength={100} onChangeText={v => set("occupation", v)} />
+      <Field label="Languages · optional" placeholder="e.g. Hindi, English" value={p.languages || ""} maxLength={100} onChangeText={v => set("languages", v)} />
+      <Label>Relationship status</Label>
+      <Chips options={["Single", "Divorced", "Widowed", "Separated", "Prefer not to say"]} selected={[p.relationshipStatus || "Prefer not to say"]} onChange={v => set("relationshipStatus", v[0])} />
+      <Label>Do you drink?</Label>
+      <Chips options={["Never", "Occasionally", "Yes", "Prefer not to say"]} selected={[p.drinking || "Prefer not to say"]} onChange={v => set("drinking", v[0])} />
+      <Body muted>These details are visible on your matching profile. Leave optional details blank if you prefer.</Body>
       <Label>I describe myself as</Label>
       <Chips
         options={GENDERS}

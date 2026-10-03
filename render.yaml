@@ -1,15 +1,21 @@
-# Deployment definition only: no resource has been purchased or created.
+# Apply only after backing up the current database. See docs/PROFILE-PHOTOS.md.
 services:
   - type: web
     name: raabta-api
     runtime: node
-    plan: free
+    plan: 0.5c-512mb
     rootDir: server
-    buildCommand: npm test
+    buildCommand: npm ci && npm test
     startCommand: node src/server.mjs
     healthCheckPath: /health
     numInstances: 1
+    disk:
+      name: raabta-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
+      - key: PROFILE_PHOTOS_ENABLED
+        value: true
       - key: NODE_VERSION
         value: 24.19.0
       - key: NODE_ENV
@@ -17,7 +23,7 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: DB_PATH
-        value: /tmp/raabta.db
+        value: /var/data/raabta.db
       - key: REGISTRATION_MODE
         value: invite
       - key: REQUIRE_EMAIL_VERIFICATION

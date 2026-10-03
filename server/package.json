@@ -10,5 +10,8 @@
     "start": "node --env-file-if-exists=.env src/server.mjs",
     "test": "node --test test/*.test.mjs",
     "setup": "node setup.mjs"
+  },
+  "dependencies": {
+    "sharp": "^0.35.5"
   }
 }

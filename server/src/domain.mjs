@@ -92,7 +92,17 @@ export function validateProfile(p, now = new Date()) {
       p.minAge <= p.maxAge,
     "Choose a valid adult age range.",
   );
+  const heightCm = p.heightCm == null ? null : p.heightCm;
+  check(heightCm === null || (Number.isInteger(heightCm) && heightCm >= 90 && heightCm <= 250), "Height must be 90–250 cm, or leave it blank.");
+  const optional = (key, max) => p[key] == null || p[key] === "" ? "" : text(p[key], key, 0, max);
   return {
+    heightCm,
+    bio: optional("bio", 400),
+    education: optional("education", 100),
+    occupation: optional("occupation", 100),
+    languages: optional("languages", 100),
+    drinking: choice(p.drinking || "Prefer not to say", ["Never", "Occasionally", "Yes", "Prefer not to say"], "drinking preference"),
+    relationshipStatus: choice(p.relationshipStatus || "Prefer not to say", ["Single", "Divorced", "Widowed", "Separated", "Prefer not to say"], "relationship status"),
     name: text(p.name, "Name", 2, 40),
     dob,
     city: text(p.city, "City", 2, 60),
@@ -195,6 +205,13 @@ export function publicProfile(u) {
     gender: u.profile.gender,
     children: u.profile.children,
     smoking: u.profile.smoking,
+    heightCm: u.profile.heightCm ?? null,
+    bio: u.profile.bio || "",
+    education: u.profile.education || "",
+    occupation: u.profile.occupation || "",
+    languages: u.profile.languages || "",
+    drinking: u.profile.drinking || "Prefer not to say",
+    relationshipStatus: u.profile.relationshipStatus || "Prefer not to say",
     card: u.card,
   };
 }

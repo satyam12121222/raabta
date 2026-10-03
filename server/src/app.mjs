@@ -9,6 +9,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { promisify } from "node:util";
+import { initPhotos, photoState, invalidatePhotos, cleanImage, PHOTO_LIMIT, expireSelfies } from "./photos.mjs";
 import { Store } from "./store.mjs";
 import { publicPage } from "./pages.mjs";
 import { makeMailer, makeModerator } from "./services.mjs";
@@ -35,12 +36,12 @@ async function passwordOK(p, h) {
     Buffer.from(await derive(p, salt, 64)),
   );
 }
-async function readBody(req) {
+async function readBody(req, max = 16384) {
   let parts = [],
     size = 0;
   for await (const c of req) {
     size += c.length;
-    check(size <= 16384, "Request too large.", 413);
+    check(size <= max, "Request too large.", 413);
     parts.push(c);
   }
   try {
@@ -66,6 +67,9 @@ export function createApp(config = {}) {
   const store =
     config.store ||
     new Store(config.dbPath || "data/raabta.db", config.dataKey);
+  initPhotos(store);
+  expireSelfies(store);
+  const photoLocks = new Set();
   const ai = config.ai || makeAI({ key: config.aiKey, model: config.aiModel });
   const mailer = config.mailer || makeMailer({ key: config.mailKey, from: config.mailFrom });
   const moderate = config.moderate || (config.moderationEnabled ? makeModerator({ key: config.aiKey }) : async () => {});
@@ -159,12 +163,17 @@ export function createApp(config = {}) {
       id: u.id,
       handle: u.handle,
       profile: u.profile,
+      media: photoState(store, u.id),
       card: u.card,
       approved: !!u.approved,
       aiConsent: !!u.ai_consent,
       progress: progress(u),
       aiConfigured: !!config.ai || !!(config.aiKey && config.aiModel),
     };
+  }
+  function visibleProfile(u) {
+    const media = photoState(store, u.id);
+    return { ...publicProfile(u), photos: media.status === "verified" ? media.photos : [], photoVerified: media.status === "verified" };
   }
   function eligible(u) {
     return !!u && !u.suspended && !!u.approved && (!config.requireVerification || !!contact(u.id)?.verified) && progress(u).ready;
@@ -208,7 +217,7 @@ export function createApp(config = {}) {
       return null;
     return {
       id: i.id,
-      person: publicProfile(other),
+      person: visibleProfile(other),
       acceptedByMe: !!(i.a === u.id ? i.a_yes : i.b_yes),
       connected: !!(i.a_yes && i.b_yes),
       comparison: compatible(u, other),
@@ -247,6 +256,7 @@ export function createApp(config = {}) {
       if (email) check(!store.get("SELECT 1 FROM contacts WHERE email_hash=?", emailHash(email)), "Unable to create account with these details. Try signing in or recovering your account.", 409);
       const p = text(b.password, "Password", 12, 128);
       const profile = validateProfile(b.profile);
+      if (profile.bio || profile.occupation || profile.education || profile.languages) await moderate([profile.bio, profile.occupation, profile.education, profile.languages].join("\n"), "public");
       check(b.adultConsent === true, "Confirm that you are an adult.");
       const pw = await passwordHash(p),
         id = randomUUID();
@@ -323,6 +333,67 @@ export function createApp(config = {}) {
     const token = (req.headers.authorization || "").replace(/^Bearer /, "");
     check(token.length > 20, "Sign in to continue.", 401);
     const u = session(token);
+    if (path === "/me/photos" && method === "GET") return photoState(store, u.id);
+    const slotMatch = path.match(/^\/me\/photos\/([1-3])$/);
+    if (slotMatch && ["PUT", "DELETE"].includes(method)) {
+      check(config.photoUploadsEnabled !== false, "Photo uploads need permanent storage. Contact support.", 503);
+      assertVerified(u);
+      limit("photos:" + u.id, 30);
+      check(!photoLocks.has(u.id), "Photo update in progress.", 409);
+      check(photoLocks.size < 4, "Photo service busy. Please retry.", 503);
+      photoLocks.add(u.id);
+      try {
+        const body = method === "PUT" ? await readBody(req, PHOTO_LIMIT * 4 / 3 + 1024) : null;
+        const image = body ? await cleanImage(body.base64) : null;
+        check(store.user(u.id) && !store.user(u.id).suspended, "Please sign in again.", 401);
+        store.transaction(() => {
+          if (image) store.run("INSERT INTO profile_photos(user_id,slot,id,body) VALUES(?,?,?,?) ON CONFLICT(user_id,slot) DO UPDATE SET id=excluded.id,body=excluded.body", u.id, Number(slotMatch[1]), randomUUID(), store.seal(image));
+          else store.run("DELETE FROM profile_photos WHERE user_id=? AND slot=?", u.id, Number(slotMatch[1]));
+          invalidatePhotos(store, u.id);
+        });
+        return photoState(store, u.id);
+      } finally { photoLocks.delete(u.id); }
+    }
+    if (path === "/me/photo-verification" && method === "DELETE") {
+      check(!photoLocks.has(u.id), "Photo update in progress.", 409);
+      invalidatePhotos(store, u.id);
+      return photoState(store, u.id);
+    }
+    if (path === "/me/photo-verification" && method === "POST") {
+      check(config.photoUploadsEnabled !== false, "Photo uploads need permanent storage. Contact support.", 503);
+      assertVerified(u);
+      limit("selfie:" + u.id, 5, 86400000);
+      check(!photoLocks.has(u.id), "Photo update in progress.", 409);
+      check(photoLocks.size < 4, "Photo service busy. Please retry.", 503);
+      photoLocks.add(u.id);
+      try {
+        const b = await readBody(req, PHOTO_LIMIT * 4 / 3 + 2048);
+        check(b.consent === true, "Agree to private manual selfie review.");
+        const before = photoState(store, u.id);
+        check(before.photos.length === 3 && b.revision === before.revision, "Add three photos before submitting a selfie.", 409);
+        check(before.status !== "pending", "Your selfie is already awaiting review.", 409);
+        const image = await cleanImage(b.base64);
+        check(store.user(u.id) && !store.user(u.id).suspended, "Please sign in again.", 401);
+        store.transaction(() => {
+          check(photoState(store, u.id).revision === b.revision, "Photos changed. Please retry.", 409);
+          store.run("UPDATE photo_reviews SET revision=?,status='pending',selfie=?,expires=?,reason='',reviewer=NULL,reviewed=NULL WHERE user_id=?", randomUUID(), store.seal(image), Date.now() + 7 * 86400000, u.id);
+          consent(u.id, "manual-photo-review", true);
+        });
+        return photoState(store, u.id);
+      } finally { photoLocks.delete(u.id); }
+    }
+    const photoMatch = path.match(/^\/photos\/([a-f0-9-]+)$/);
+    if (photoMatch && method === "GET") {
+      const photo = store.get("SELECT * FROM profile_photos WHERE id=?", photoMatch[1]);
+      check(photo, "Photo not available.", 404);
+      if (photo.user_id !== u.id) {
+        assertVerified(u);
+        const other = store.user(photo.user_id), intro = relevant(u.id, photo.user_id);
+        check(other && !other.suspended && !store.blocked(u.id, other.id) && photoState(store, other.id).status === "verified", "Photo not available.", 404);
+        check((intro && !intro.closed) || (!intro && eligible(u) && eligible(other) && compatible(u, other)), "Photo not available.", 404);
+      }
+      return { base64: store.open(photo.body), mimeType: "image/jpeg" };
+    }
     if (path === "/auth/logout" && method === "POST") {
       store.run("DELETE FROM sessions WHERE token=?", hash(token));
       return { ok: true };
@@ -381,6 +452,7 @@ export function createApp(config = {}) {
     if (path === "/me" && method === "PUT") {
       const b = await readBody(req),
         p = validateProfile(b.profile);
+      if (p.bio || p.occupation || p.education || p.languages) await moderate([p.bio, p.occupation, p.education, p.languages].join("\n"), "public");
       check(!inFlight.has(u.id), "Wait for the current AI response.", 409);
       store.transaction(() => {
         store.run(
@@ -595,7 +667,7 @@ export function createApp(config = {}) {
             eligible(v) && !store.blocked(u.id, v.id) && !relevant(u.id, v.id),
         )
         .map((v) => ({
-          person: publicProfile(v),
+          person: visibleProfile(v),
           comparison: compatible(u, v),
         }))
         .filter((v) => v.comparison)
@@ -824,6 +896,9 @@ export function createApp(config = {}) {
       if (status === 500) console.error("Internal request error:", e.name);
     }
   });
+  const cleanup = setInterval(() => expireSelfies(store), 60000);
+  cleanup.unref();
+  server.on("close", () => clearInterval(cleanup));
   server.requestTimeout = 60000;
   server.headersTimeout = 15000;
   return { server, store };
