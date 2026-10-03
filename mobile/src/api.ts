@@ -38,7 +38,7 @@ export async function api<T = any>(
   if (!__DEV__ && !base.startsWith("https://"))
     throw new ApiError(503, "Release builds require an HTTPS backend.");
   const controller = new AbortController(),
-    timeout = setTimeout(() => controller.abort(), 55000);
+    timeout = setTimeout(() => controller.abort(), 90000);
   try {
     const r = await fetch(base + path, {
       method,
@@ -57,7 +57,9 @@ export async function api<T = any>(
     if (e instanceof ApiError) throw e;
     throw new ApiError(
       0,
-      "Could not reach Raabta. Check your connection and try again.",
+      controller.signal.aborted
+        ? "Raabta took too long to respond. The test server may be waking up. Please retry."
+        : "Could not reach Raabta. Check your connection and try again.",
     );
   } finally {
     clearTimeout(timeout);

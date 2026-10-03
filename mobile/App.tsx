@@ -67,6 +67,9 @@ import {
   useLocalSearchParams,
 } from "expo-router";
 
+const photosEnabled = process.env.EXPO_PUBLIC_PROFILE_PHOTOS_ENABLED === "true";
+const temporaryPilot = process.env.EXPO_PUBLIC_TEMPORARY_PILOT === "true";
+
 type Tab = "Today" | "Talk" | "Connect" | "You";
 type Action = (fn: () => Promise<void>) => Promise<void>;
 function Page({ children }: { children: React.ReactNode }) {
@@ -83,6 +86,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <SafeAreaView style={s.screen}>
       <StatusBar style="dark" />
+      {temporaryPilot && <View style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: C.sage }}><Text style={s.caption}>Test version · Accounts and chats may reset. Photos are unavailable.</Text></View>}
       {children}
     </SafeAreaView>
   );
@@ -1282,7 +1286,7 @@ function Account({
           remove stored conversations and memory.
         </Text>
       </Panel>
-      <PhotosPanel refresh={refresh} />
+      {photosEnabled && <PhotosPanel refresh={refresh} />}
       <Button
         title={editing ? "Close preferences" : "Edit my preferences"}
         secondary
